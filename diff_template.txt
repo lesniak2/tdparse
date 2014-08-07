@@ -1,0 +1,40 @@
+@echo off
+setlocal EnableDelayedExpansion
+set db=db_name
+set "schemas=schema1 schema2 schema3 schema4 schema5"
+set min_consecutive_diff=10
+
+set "tables[schema1]=table1 table2 table3"
+set "tables[schema2]=table4 table5 table6"
+set "tables[schema3]=table7 table8 table9"
+set "tables[schema4]=table10 table11 table12 table13"
+set "tables[schema5]=table14 table15 table16 table 17"
+
+if not exist %db% mkdir %db%
+
+if not exist %db%\tablediff_fix mkdir %db%\tablediff_fix
+if not exist %db%\tablediff_out mkdir %db%\tablediff_out
+if not exist %db%\tdparse_out mkdir %db%\tdparse_out
+if not exist %db%\rowdiff_out mkdir %db%\rowdiff_out
+
+
+for %%s in (%schemas%) do (
+
+	if not exist %db%\tablediff_fix\%%s mkdir %db%\tablediff_fix\%%s
+	if not exist %db%\tablediff_out\%%s mkdir %db%\tablediff_out\%%s
+	if not exist %db%\tdparse_out\%%s mkdir %db%\tdparse_out\%%s
+	if not exist %db%\rowdiff_out\%%s mkdir %db%\rowdiff_out\%%s
+
+	for %%t in (!tables[%%s]!) do (
+		
+		echo running diff scripts on [%%s].[%%t]
+		
+		"C:\Program Files\Microsoft SQL Server\100\COM\tablediff.exe" -sourceserver bi-mssql-prod -sourcedatabase %db% -sourceschema %%s -sourcetable %%t -destinationserver sv-bidb-prod -destinationdatabase %db% -destinationschema %%s -destinationtable %%t -q -o "%db%\rowdiff_out\%%s\%%t_rowdiff_results.txt" >nul
+		"C:\Program Files\Microsoft SQL Server\100\COM\tablediff.exe" -sourceserver bi-mssql-prod -sourcedatabase %db% -sourceschema %%s -sourcetable %%t -destinationserver sv-bidb-prod -destinationdatabase %db% -destinationschema %%s -destinationtable %%t -c -f "%db%\tablediff_fix\%%s\%%t_fix.sql" -o "%db%\tablediff_out\%%s\%%t_tablediff_results.txt" >nul
+		"C:\Program Files\Microsoft SQL Server\100\COM\tdparse.exe" "%db%\tablediff_out\%%s\%%t_tablediff_results.txt" "%db%\tdparse_out\%%s\%min_consecutive_diff%_%%t_tdparse_results.txt" %min_consecutive_diff%
+	)
+ )
+
+echo completed diff for %db%
+pause >nul
+exit
